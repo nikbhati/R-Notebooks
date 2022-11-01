@@ -1,0 +1,485 @@
+---
+title: "Convergence"
+author: "Nikunj Bhatia"
+date: "2022-09-19"
+output: html_document
+---
+*** 
+#### A researcher for a thinktank is interested in the hypothesis of economic “convergence.” According to this theory, poorer countries’ GDP per capita will tend to “catch up” by growing faster than richer countries’ GDP per capita: 
+
+The researcher’s major research question is: When and where has there been convergence in GDP per capita since 1960? (We’ll focus on data from 1960 to 2019, since data before 1960 is unreliable and data from 2020 on wards may be atypical due to COVID.) However, he recognizes this question may be difficult to answer, at least straight away. So he has brainstormed a series of questions he would like you to address, which can be divided into three groups, mentioned below.
+
+***
+
+### Question 1
+
+What countries have grown the most and least from 1960 to 2019? Calculate the
+annual growth rate of per capita GDP as a percentage for each country. For example, world
+GDP per capita was $4933 in 1960 and $15,941 in 2018, corresponding to an annual growth
+rate of 2.04%. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+gdp=read.csv('GM-GDP per capita - Dataset - v28 - data-for-countries-etc-by-year.csv')
+population=read.csv('GM-Population - Dataset - v6 - data-for-countries-etc-by-year.csv')
+continents = read.delim("continents.txt" ,header = TRUE, sep = " ", dec = ".")
+```
+
+
+Let us filter relevant data from our dataframes:
+
+```{r}
+gdp_valid = filter(gdp, time>=1960 & time<=2019)
+population_valid = filter(population, time>=1960 & time<=2019)
+```
+
+
+Let us compute the average gdp growth rate for each country from 1960 to 2019:
+
+```{r}
+gdp_pop=merge(gdp_valid,population_valid,on=c('name','time'))
+merged_df=merge(continents,gdp_pop,on='name')
+gdp_1960_2019=filter(merged_df,time==1960 | time==2019)
+gdp_1960_2019$gdppercap=gdp_1960_2019$GDP.total / gdp_1960_2019$Population
+ggddpp = gdp_1960_2019 [c('name','time','gdppercap')]
+gdpcap_1960= filter(ggddpp,time==1960)
+gdpcap_2019= filter(ggddpp,time==2019)
+#gdpcap_2019 = gdpcap_2019 %>% rename(gdppercap19 = gdppercap)
+names(gdpcap_2019)[names(gdpcap_2019) == 'gdppercap'] <- 'gdppercap19'
+names(gdpcap_2019)[names(gdpcap_2019) == 'time'] <- 'time19'
+ggddpp = left_join(gdpcap_1960,gdpcap_2019, by=c('name'))
+ggddpp$gdp_rate = 100*((ggddpp$gdppercap19/ggddpp$gdppercap)^(1/59))-100
+```
+
+
+Let us identify some relevant data points for further analysis:
+
+```{r}
+# Countries with highest GDP growth rate
+top_10_gdp_rate <- top_n(ggddpp, 10, gdp_rate)
+top_10_gdp_rate$category <- "Fast Growth"
+
+# Countries with lowest GDP growth rate
+bottom_10_gdp_rate <- top_n(ggddpp, -10, gdp_rate)
+bottom_10_gdp_rate$category <- "Slow Growth"
+
+# Countries with lowest GDP
+top_10_gdp <- top_n(ggddpp, 10, gdppercap)
+top_10_gdp$category <- "Rich"
+
+# Countries with highest GDP
+bottom_10_gdp <- top_n(ggddpp, -10, gdppercap)
+bottom_10_gdp$category <- "Poor"
+```
+
+Draw a visualization of the ten fastest growing and the ten least fast growing
+countries and their growth rates. 
+
+These are the fastest growing countries:
+
+```{r}
+ggplot(top_10_gdp_rate,aes(x=reorder(name,gdp_rate),y=gdp_rate,size=gdppercap))+geom_point(color='red')+ ylab("(%) Annual GDP Growth Rate") + xlab("Country") +ggtitle("Figure 1:Fastest Growing Countries between 1960 and 2019")+
+  labs(size="GDP per Capita")+
+  #scale_x_discrete(guide = guide_axis(n.dodge=3))+
+  coord_flip()+theme(plot.title = element_text(hjust = 0.5,color = 'red'),plot.subtitle = element_text(hjust = 0.5,color = 'red'),strip.background=element_rect(colour="black",fill="yellow"),axis.title.x = element_text(colour = "red"),
+          axis.title.y = element_text(colour = "red"))
+```
+
+These are the slowest growing countries:
+
+```{r}
+ggplot(bottom_10_gdp_rate,aes(x=reorder(name,gdp_rate),y=gdp_rate,size=gdppercap))+geom_point(color='red')+ ylab("(%) Annual GDP Growth Rate") + xlab("Country") +ggtitle("Figure 2:Slowest Growing Countries between 1960 and 2019")+labs(size="GDP per Capita")+
+ # scale_y_discrete(guide = guide_axis(n.dodge=3))+
+  coord_flip()+theme(plot.title = element_text(hjust = 0.5,color = 'red'),plot.subtitle = element_text(hjust = 0.5,color = 'red'),strip.background=element_rect(colour="black",fill="yellow"),axis.title.x = element_text(colour = "red"),
+          axis.title.y = element_text(colour = "red"))
+```
+
+We observe that slower growing countries had more GDP per capita on average when compared to faster growing countries 
+
+Do the fastest-growing countries have anything in common? The slowest-growing countries?
+
+When we compare the countries with fast and slow growth, we observe that countries that are having a faster growth rate - had significantly lower gdppercap in 1960. Richer countries tend to have slower growth rates when compared to poorer countries. 
+
+
+Poorer countries tend to have a higher growth rate when compared to the richer countries.
+
+
+***
+
+### Question 2
+
+In general, has there been convergence since 1960? Visualize the relationship between
+per capita GDP in 1960 and annual growth rate from 1960 to 2019. Looking at the data as a whole, 
+is there evidence for convergence? 
+
+Looking at the data as a whole, there is no evident relationship between gdppercap and gdp_rate. There seems to be a very small negative relationship between the two.
+
+```{r}
+ggplot(data = ggddpp, aes(x = gdp_rate, y = gdppercap)) + 
+  geom_point(color='red', alpha = 0.7) + 
+  scale_y_log10() + 
+  geom_smooth(method = "lm", se = FALSE, color='black') + 
+  xlab("(%) Annual GDP Growth Rate") + 
+  ylab("GDP Per Capita in 1960, (log scale)") +
+  ggtitle("Figure 3: Annual GDP Growth Rate vs GDP Per Capita between 1960-2019 ")+theme(plot.title = element_text(hjust = 0.5,color = 'red'),plot.subtitle = element_text(hjust = 0.5,color = 'red'),strip.background=element_rect(colour="black",fill="yellow"),axis.title.x = element_text(colour = "red"),
+          axis.title.y = element_text(colour = "red"))
+```
+
+
+
+```{r}
+ggddpp = left_join(ggddpp,continents, on='name')
+ggddpp = ggddpp[!(ggddpp$continent=="Oceania"),]
+```
+
+Also group the data by continent (Asia, Africa,Europe, and the Americas.) 
+Has there been convergence between richer and poorer continents?
+
+```{r}
+plot3 = merge(ggddpp,gdp_1960_2019,on=c('name','time'))
+```
+
+
+```{r}
+ggplot(plot3,aes(x=gdp_rate,y=gdppercap,color=continent))+
+  geom_point()+
+  scale_y_log10()+geom_smooth(method = 'lm',se=FALSE)+ 
+  xlab("(%) Annual GDP Growth Rate") + 
+  ylab("GDP Per Capita in 1960, (log scale)") +
+  ggtitle("Figure 4:Annual GDP Growth Rate vs GDP Per Capita in 1960 ")+labs(color="Continent")+
+  scale_color_viridis_d()+
+  theme(title = element_text(colour = "red"))
+```
+
+When we look at the grouped data, we can observe that most countries show convergence to some level. Countries like Asia, Europe and Americas show high levels of convergence. Africa on the other hand, does not seem to show the convergence phenomenon. This can be because there are not many rich nations in Africa in 1960.
+
+```{r}
+mod.lm = lm(log10(gdppercap) ~ gdp_rate+continent, data = plot3)
+mod.lm.df = data.frame(plot3, .resid = residuals(mod.lm), .fitted= fitted.values(mod.lm))
+ggplot(mod.lm.df, aes(x=gdp_rate,y=.resid))+
+  geom_point(color="red",alpha=0.7)+
+  geom_smooth(method='lm',se=FALSE,color="black")+
+  scale_color_viridis_d()+xlab("Annual GDP Growth Rate(%)")+ylab("Residuals of GDP per cap, log scale")+
+  ggtitle("Figure 13 : Residual Plot of Growth Rate between 1960-2019")+
+  theme(title = element_text(colour = "red"))+
+  facet_wrap(~continent)
+```
+
+```{r}
+mod1 = lm(gdp_rate ~ log10(gdppercap) + continent, data=plot3)
+summary(mod1)
+```
+
+
+```{r}
+
+plot32 = plot3 %>% group_by(continent) %>% summarise(mediangrowth = median(gdp_rate), mediangdpcap = median(gdppercap), mediangdpcap19=median(gdppercap19)) 
+#plot32 = plot32[order(plot32$mediangdpcap),]
+ggplot(plot32, aes(x=mediangrowth, y= mediangdpcap))+geom_point(aes(color=continent))+geom_smooth(method='lm',se=FALSE,color="black")+scale_y_log10()+
+  scale_color_viridis_d()+ggtitle("Figure 12 : Convergence between rich and poor continents")+xlab("Median Annual GDP Growth for each continent")+ylab("Median GDP per cap for each continent, log scale")+labs(color="Continent")+
+  theme(title = element_text(colour = "red"))
+```
+
+
+```{r}
+ggplot(plot32, aes(x=mediangdpcap, y=mediangdpcap19))+geom_point(aes(size=mediangrowth, color=continent))+
+  scale_y_log10()+
+  labs(color="Continent", size="Median Growth%")+
+  xlab("Median GDP per capita in 1960")+
+  ylab("Median GDP per capita in 2019, log scale")+
+  ggtitle("Figure 13: Convergence Analysis between Continents between 1960-2019")+
+  scale_color_viridis_d()+
+  theme(title = element_text(colour = "red"))
+```
+
+
+***
+
+### Question 3
+
+Has the pattern been different in different time periods? Now divide the time since
+1960 into three time periods: 1960 to 1980, 1980 to 2000, and 2000 to 2019.
+Repeat your analysis from Part 2 for each time period. What are the differences in convergence across
+these three time periods?
+
+```{r}
+gdp_1960_1980 = filter(merged_df,time>=1960 | time <1980)
+gdp_1980_2000 = filter(merged_df,time>=1980 | time <2000)
+gdp_2000_2019 = filter(merged_df,time>=2000 | time <2020)
+```
+
+
+##### 1960-1980 convergence Analysis
+
+Let us have a look at convergence as a whole between 1960-1980. There does not seem to be a clear trend for this range.
+
+```{r}
+gdp_1960_1980$gdppercap=gdp_1960_1980$GDP.total / gdp_1960_1980$Population
+
+ggddpp = gdp_1960_1980 [c('name','time','gdppercap')]
+gdpcap_1960= filter(ggddpp,time==1960)
+gdpcap_1980= filter(ggddpp,time==1979)
+names(gdpcap_1980)[names(gdpcap_1980) == 'gdppercap'] <- 'gdppercap80'
+names(gdpcap_1980)[names(gdpcap_1980) == 'time'] <- 'time80'
+ggddpp = left_join(gdpcap_1960,gdpcap_1980,on=c('name'))
+ggddpp$gdp_rate = 100*((ggddpp$gdppercap80/ggddpp$gdppercap)^(1/20))-100
+ggplot(ggddpp,aes(x=gdp_rate,y=gdppercap))+
+  geom_point(color='red', alpha = 0.7)+
+  scale_y_log10()+
+  geom_smooth(method = 'lm',se=FALSE, color ='black')+ 
+  xlab("(%) Annual GDP Growth Rate") + 
+  ylab("GDP Per Capita in 1960, (log scale)") +
+  ggtitle("Figure 5: Convergence Analysis between 1960-1979 ")+
+  theme(title = element_text(colour = "red"))
+```
+
+
+```{r}
+ggddpp = left_join(ggddpp,continents, on='name')
+ggddpp = ggddpp[!(ggddpp$continent=="Oceania"),]
+ggplot(ggddpp,aes(x=gdp_rate,y=gdppercap,color=continent))+
+  geom_point()+
+  scale_y_log10()+geom_smooth(method = 'lm',se=FALSE)+ xlab("(%) Annual GDP Growth Rate") + ylab("GDP Per Capita in 1960-1980, (log scale)") +ggtitle("Figure 6:Convergence Analysis between 1960-1979 ")+
+  scale_color_viridis_d()+labs(color="Continent")+
+  theme(title = element_text(colour = "red"))
+```
+
+
+Let us look at convergence on a continent level:
+
+* Americas and Europe are showing convergence phenomenon.
+* Asia, Africa are continents in which convergence is not observed.
+
+```{r}
+mod.lm1 = lm(log10(gdppercap) ~ gdp_rate+continent, data = ggddpp)
+mod.lm.df1 = data.frame(ggddpp, .resid = residuals(mod.lm1), .fitted= fitted.values(mod.lm1))
+ggplot(mod.lm.df1, aes(x=gdp_rate,y=.resid))+
+  geom_point(color="red",alpha=0.7)+
+  geom_smooth(method='lm',se=FALSE,color="black")+
+  scale_color_viridis_d()+xlab("Annual GDP Growth Rate(%)")+ylab("Residuals of GDP per cap, log scale")+
+  ggtitle("Figure 14 : Residual Plot of Growth Rate between 1960-1979")+
+  theme(title = element_text(colour = "red"))+
+  facet_wrap(~continent)
+```
+
+
+
+
+
+##### 1980-2000 Convergence Analysis
+
+Let us have a look at convergence as a whole between 1980-2000. There does not seem to be a clear trend for this range.
+
+```{r}
+gdp_1980_2000$gdppercap=gdp_1980_2000$GDP.total / gdp_1980_2000$Population
+
+ggddpp = gdp_1980_2000 [c('name','time','gdppercap')]
+gdpcap_1980= filter(ggddpp,time==1980)
+gdpcap_2000= filter(ggddpp,time==1999)
+names(gdpcap_2000)[names(gdpcap_2000) == 'gdppercap'] <- 'gdppercap00'
+names(gdpcap_2000)[names(gdpcap_2000) == 'time'] <- 'time00'
+ggddpp = left_join(gdpcap_1980,gdpcap_2000,on=c('name'))
+ggddpp$gdp_rate = 100*((ggddpp$gdppercap00/ggddpp$gdppercap)^(1/20))-100
+ggplot(ggddpp,aes(x=gdp_rate,y=gdppercap))+geom_point(color="red", alpha=0.7)+
+  scale_y_log10()+geom_smooth(method = 'lm',se=FALSE, color="black") +  xlab("(%) Annual GDP Growth Rate") + ylab("GDP Per Capita in 1980, (log scale)") +ggtitle("Figure 7 :Convergence Analysis between 1980-1999 ")+
+  scale_color_viridis_d()+labs(color="Continent")+
+  theme(title = element_text(colour = "red"))
+```
+
+Let us look at convergence on a continent level:
+
+
+```{r}
+ggddpp = left_join(ggddpp,continents, on='name')
+ggddpp = ggddpp[!(ggddpp$continent=="Oceania"),]
+ggplot(ggddpp,aes(x=gdp_rate,y=gdppercap,color=continent))+
+  geom_point()+
+  scale_y_log10()+geom_smooth(method = 'lm',se=FALSE)+xlab("(%) Annual GDP Growth Rate") + ylab("GDP Per Capita in 1980,(log scale)") +ggtitle("Figure 8:Convergence Analysis between 1980-1999 ")+
+  scale_color_viridis_d()+labs(color="Continent")+
+  theme(title = element_text(colour = "red"))
+```
+
+* Asia continent shows some convergence
+* Europe, Africa and Americas do not show convergence
+
+
+```{r}
+mod.lm2 = lm(log10(gdppercap) ~ gdp_rate+continent, data = ggddpp)
+mod.lm.df2 = data.frame(ggddpp, .resid = residuals(mod.lm2), .fitted= fitted.values(mod.lm2))
+#ggplot(mod.lm.df, aes(x=gdp_rate,y=.fitted, color=continent))+geom_point()
+ggplot(mod.lm.df2, aes(x=gdp_rate,y=.resid))+
+  geom_point(color="red",alpha=0.7)+
+  geom_smooth(method='lm',se=FALSE,color="black")+
+  scale_color_viridis_d()+xlab("Annual GDP Growth Rate(%)")+ylab("Residuals of GDP per cap, log scale")+
+  ggtitle("Figure 15 : Residual Plot of Growth Rate between 1980-1999")+
+  theme(title = element_text(colour = "red"))+
+  facet_wrap(~continent)
+```
+
+
+
+
+##### 2000-2019 convergence Analysis
+
+Let us have a look at convergence as a whole between 2000-2019. There seems to be some level of convergence during this period.
+
+```{r}
+gdp_2000_2019$gdppercap=gdp_2000_2019$GDP.total / gdp_2000_2019$Population
+
+ggddpp = gdp_2000_2019 [c('name','time','gdppercap')]
+gdpcap_2000= filter(ggddpp,time==2000)
+gdpcap_2019= filter(ggddpp,time==2019)
+names(gdpcap_2019)[names(gdpcap_2019) == 'gdppercap'] <- 'gdpperca19'
+names(gdpcap_2019)[names(gdpcap_2019) == 'time'] <- 'time19'
+ggddpp = left_join(gdpcap_2000,gdpcap_2019,on=c('name'))
+ggddpp$gdp_rate = 100*((ggddpp$gdpperca19/ggddpp$gdppercap)^(1/20))-100
+ggplot(ggddpp,aes(x=gdp_rate,y=gdppercap))+geom_point(color='red',alpha=0.7)+
+  scale_y_log10()+geom_smooth(method = 'lm',se=FALSE,color="black")+ xlab("(%) Annual GDP Growth Rate") + ylab("GDP Per Capita in 2000,(log scale)") +ggtitle("Figure 9 :Convergence Analysis between 2000-2019 ")+
+  scale_color_viridis_d()+labs(color="Continent")+
+  theme(title = element_text(colour = "red"))
+```
+
+
+Let us look at convergence on a continent level:
+
+
+```{r}
+ggddpp = left_join(ggddpp,continents, on='name')
+ggddpp = ggddpp[!(ggddpp$continent=="Oceania"),]
+ggplot(ggddpp,aes(x=gdp_rate,y=gdppercap,color=continent))+
+  geom_point(alpha=0.7)+
+  scale_y_log10()+geom_smooth(method = 'lm',se=FALSE)+ xlab("(%) Annual GDP Growth Rate") + ylab("GDP Per Capita in 2000,(log scale)") +ggtitle("Figure 10: Convergence Analysis between 2000-2019 ")+scale_color_viridis_d()+
+  scale_color_viridis_d()+labs(color="Continent")+
+  theme(title = element_text(colour = "red"))
+```
+
+
+* Asia and Europe are continents showing convergence
+* Americas and Africa shows some level of convergence
+
+```{r}
+mod.lm3 = lm(log10(gdppercap) ~ gdp_rate+continent, data = ggddpp)
+mod.lm.df3 = data.frame(ggddpp, .resid = residuals(mod.lm3), .fitted= fitted.values(mod.lm3))
+#ggplot(mod.lm.df, aes(x=gdp_rate,y=.fitted, color=continent))+geom_point()
+ggplot(mod.lm.df3, aes(x=gdp_rate,y=.resid))+
+  geom_point(color="red",alpha=0.7)+
+  geom_smooth(method='lm',se=FALSE,color="black")+
+  scale_color_viridis_d()+xlab("Annual GDP Growth Rate(%)")+ylab("Residuals of GDP per cap, log scale")+
+  ggtitle("Figure 16 : Residual Plot of Growth Rate between 2000-2019")+
+  theme(title = element_text(colour = "red"))+
+  facet_wrap(~continent,scales = "free")
+```
+
+
+
+```{r}
+gdp_1960_1980$gdppercap=gdp_1960_1980$GDP.total / gdp_1960_1980$Population
+
+ggddpp1 = gdp_1960_1980 [c('name','time','gdppercap')]
+gdpcap_1960= filter(ggddpp1,time==1960)
+gdpcap_1980= filter(ggddpp1,time==1979)
+names(gdpcap_1980)[names(gdpcap_1980) == 'gdppercap'] <- 'gdppercaplatter'
+names(gdpcap_1980)[names(gdpcap_1980) == 'time'] <- 'timelatter'
+ggddpp1 = left_join(gdpcap_1960,gdpcap_1980,on=c('name'))
+ggddpp1$gdp_rate = 100*((ggddpp1$gdppercaplatter/ggddpp1$gdppercap)^(1/20))-100
+
+gdp_1980_2000$gdppercap=gdp_1980_2000$GDP.total / gdp_1980_2000$Population
+
+ggddpp2 = gdp_1980_2000 [c('name','time','gdppercap')]
+gdpcap_1980= filter(ggddpp2,time==1980)
+gdpcap_2000= filter(ggddpp2,time==1999)
+names(gdpcap_2000)[names(gdpcap_2000) == 'gdppercap'] <- 'gdppercaplatter'
+names(gdpcap_2000)[names(gdpcap_2000) == 'time'] <- 'timelatter'
+
+ggddpp2 = left_join(gdpcap_1980,gdpcap_2000,on=c('name'))
+ggddpp2$gdp_rate = 100*((ggddpp2$gdppercaplatter/ggddpp2$gdppercap)^(1/20))-100
+
+
+gdp_2000_2019$gdppercap=gdp_2000_2019$GDP.total / gdp_2000_2019$Population
+
+ggddpp3 = gdp_2000_2019 [c('name','time','gdppercap')]
+gdpcap_2000= filter(ggddpp3,time==2000)
+gdpcap_2019= filter(ggddpp3,time==2019)
+names(gdpcap_2019)[names(gdpcap_2019) == 'gdppercap'] <- 'gdppercaplatter'
+names(gdpcap_2019)[names(gdpcap_2019) == 'time'] <- 'timelatter'
+
+
+
+ggddpp3 = left_join(gdpcap_2000,gdpcap_2019,on=c('name'))
+ggddpp3$gdp_rate = 100*((ggddpp3$gdppercaplatter/ggddpp3$gdppercap)^(1/20))-100
+combgg = rbind(ggddpp1,ggddpp2,ggddpp3)
+```
+
+```{r}
+combgg = left_join(combgg,continents, on='name')
+combgg = combgg[!(combgg$continent=="Oceania"),]
+```
+
+```{r}
+combgg["time"][combgg["time"] == "1960"] <- "1960-1979"
+combgg["time"][combgg["time"] == "1980"] <- "1980-1999"
+combgg["time"][combgg["time"] == "2000"] <- "2000-2019"
+```
+
+
+```{r}
+ggplot(combgg,aes(x=gdp_rate,y=gdppercap,color=factor(time),group=time))+
+  #geom_point()+
+  scale_y_log10()+facet_wrap(~continent,ncol=2,scales = "free")+
+  geom_smooth(method = 'lm',se=FALSE)+scale_color_viridis_d()+xlab("Annual GDP Rate (%)")+labs(color="YEAR")+
+  ylab("GDP per Capita,(log scale)")+ggtitle("Figure 11: Convergence Patterns for different Continents between 1960-2019", subtitle = "3 Time Frames of 20 years each between 1960-2019")+
+  scale_color_viridis_d()+labs(color="Continent")+
+  theme(title = element_text(colour = "red"))
+```
+
+
+```{r}
+ggddpp1 = left_join(ggddpp1,continents, on='name')
+ggddpp1 = ggddpp1[!(ggddpp1$continent=="Oceania"),]
+plotapp1 = ggddpp1 %>% group_by(continent) %>% summarise(mediangrowth = median(gdp_rate), mediangdpcap = median(gdppercap), mediangdpcap19=median(gdppercaplatter)) 
+ggplot(plotapp1, aes(x=mediangdpcap, y=mediangdpcap19))+geom_point(aes(size=mediangrowth, color=continent))+
+  scale_y_log10()+
+  labs(color="Continent", size="Median Growth%")+
+  xlab("Median GDP per capita in 1960")+
+  ylab("Median GDP per capita in 1979, log scale")+
+  ggtitle("Figure 13: Convergence Analysis between Continents between 1960-1979")+
+  scale_color_viridis_d()+
+  theme(title = element_text(colour = "red"))
+```
+
+
+```{r}
+ggddpp2 = left_join(ggddpp2,continents, on='name')
+ggddpp2 = ggddpp2[!(ggddpp2$continent=="Oceania"),]
+plotapp2 = ggddpp2 %>% group_by(continent) %>% summarise(mediangrowth = median(gdp_rate), mediangdpcap = median(gdppercap), mediangdpcap19=median(gdppercaplatter)) 
+ggplot(plotapp2, aes(x=mediangdpcap, y=mediangdpcap19))+geom_point(aes(size=mediangrowth, color=continent))+
+  scale_y_log10()+
+  labs(color="Continent", size="Median Growth%")+
+  xlab("Median GDP per capita in 1980")+
+  ylab("Median GDP per capita in 1999, log scale")+
+  ggtitle("Figure 15: Convergence Analysis between Continents between 1980-1999")+
+  scale_color_viridis_d()+
+  theme(title = element_text(colour = "red"))
+```
+
+
+```{r}
+ggddpp3 = left_join(ggddpp3,continents, on='name')
+ggddpp3 = ggddpp3[!(ggddpp3$continent=="Oceania"),]
+plotapp3 = ggddpp3 %>% group_by(continent) %>% summarise(mediangrowth = median(gdp_rate), mediangdpcap = mean(gdppercap), mediangdpcap19=mean(gdppercaplatter)) 
+ggplot(plotapp1, aes(x=mediangdpcap, y=mediangdpcap19))+geom_point(aes(size=mediangrowth, color=continent))+
+  scale_y_log10()+
+  labs(color="Continent", size="Median Growth%")+
+  xlab("Median GDP per capita in 2000")+
+  ylab("Median GDP per capita in 2019, log scale")+
+  ggtitle("Figure 16: Convergence Analysis between Continents between 2000-2019")+
+  scale_color_viridis_d()+
+  theme(title = element_text(colour = "red"))
+```
+
+
